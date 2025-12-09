@@ -1,0 +1,51 @@
+---
+title: "Data_Preparation"
+output: html_document
+---
+
+GOAL:
+Load all three datasets (controls, heroin, methamphetamine)
+Ensure identical formatting across groups
+Check for missing data, outliers, or unusual patterns
+Verify participants completed sufficient trials (ideally 95-100 trials)
+
+```{r}
+# Load necessary libraries
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+```
+
+
+```{r}
+# set working directory for whole notebook
+getwd()
+
+# Load datasets txt file
+controls <- read.table("../data/IGTdata_healthy_control.txt")
+heroin <- read.csv("../data/IGTdata_heroin.txt") # needs to be read.csv for the file format
+meth <- read.csv("../data/IGTdata_amphetamine.txt") # needs to be read.csv for the file format
+
+# convert table to csv
+write.csv(controls, "../data/IGTdata_healthy_control.csv", row.names = FALSE)
+write.csv(heroin, "../data/IGTdata_heroin.csv", row.names = FALSE)
+write.csv(meth, "../data/IGTdata_amphetamine.csv", row.names = FALSE)
+
+# Load csvs
+controls <-read.csv("../data/IGTdata_healthy_control.csv")
+heroin <- read.csv("../data/IGTdata_heroin.csv")
+meth <- read.csv("../data/IGTdata_amphetamine.csv")
+
+# set row 1 in each df as the column names and delete row 1
+colnames(controls) <- as.character(unlist(controls[1, ])) 
+colnames(heroin) <- as.character(unlist(heroin[1, ]))
+colnames(meth) <- as.character(unlist(meth[1, ]))
+
+# delete row 1 with old column names
+controls <- controls[-1, ]
+heroin <- controls[-1, ]
+meth <- controls[-1, ]
+
+```
+
+
