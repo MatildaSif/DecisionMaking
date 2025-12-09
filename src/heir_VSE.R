@@ -1,3 +1,5 @@
+#Joe added a comment
+
 library(R2jags)
 
 setwd("C:/Users/au199986/Dropbox/Courses/F20/CognitiveModeling/Module4/rawData_IGT")
