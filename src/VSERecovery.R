@@ -1,8 +1,9 @@
 
-library(extraDistr)
-library(R2jags)
+install.packages("pacman")
+pacman::p_load(extraDistr, R2jags)
 
-setwd("C:/Users/au199986/Dropbox/Courses/F20/CognitiveModeling/Module3")
+
+setwd("/work/JohanneSejrskildRejsenhus#9686/DecisionMaking/src")
 set.seed(1982)
 
 #------ create task environment -------------------

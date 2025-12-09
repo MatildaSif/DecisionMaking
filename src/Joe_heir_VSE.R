@@ -1,10 +1,18 @@
+#Joe's version trying to add all data at once
 
 library(R2jags)
 
-setwd("C:/Users/au199986/Dropbox/Courses/F20/CognitiveModeling/Module4/rawData_IGT") # change the working directory
+setwd("/work/JohanneSejrskildRejsenhus#9686/DecisionMaking/data")
+
+# defining a function for calculating the maximum of the posterior density (not exactly the same as the mode)
+MPD <- function(x) {
+  density(x)$x[which(density(x)$y==max(density(x)$y))]
+}
 
 #load control data
-ctr_data <- read.table("IGTdata_healthy_control.txt",header=TRUE) 
+ctr_data <- read.table("IGTdata_healthy_control.txt",header=TRUE)
+opi_data <- read.table("IGTdata_heorin.txt",header=TRUE)
+amp_data <- read.table("IGTdata_amphetamine.txt",header=TRUE)
 
 #----------prepare data for jags models - want trial x subject arrays for choice, gain, and loss ----
 # identify and count unique subject IDs
