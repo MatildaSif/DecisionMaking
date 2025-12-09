@@ -138,6 +138,7 @@ for (i in 1:niterations) {
   true_delta[i] <- delta
   true_alpha[i] <- alpha
   true_phi[i] <- phi
+  
   true_c[i] <- c
   
   # find maximum a posteriori
@@ -168,6 +169,8 @@ plot(true_delta,infer_delta)
 plot(true_alpha,infer_alpha)
 plot(true_phi,infer_phi)
 plot(true_c,infer_c)
+
+print(plot)
 
 
 
