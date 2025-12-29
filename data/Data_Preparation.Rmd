@@ -4,7 +4,7 @@ output: html_document
 ---
 
 GOAL:
-Load all three datasets (controls, heroin, methamphetamine)
+Load all three datasets (controls, heroin, ampamphetamine)
 Ensure identical formatting across groups
 Check for missing data, outliers, or unusual patterns
 Verify participants completed sufficient trials (ideally 95-100 trials)
@@ -16,7 +16,7 @@ library(ggplot2)
 library(tidyverse)
 ```
 
-
+''' LOADING DATA '''
 ```{r}
 # set working directory for whole notebook
 getwd()
@@ -24,34 +24,45 @@ getwd()
 # Load datasets txt file
 controls <- read.table("../data/IGTdata_healthy_control.txt")
 heroin <- read.csv("../data/IGTdata_heroin.txt") # needs to be read.csv for the file format
-meth <- read.csv("../data/IGTdata_amphetamine.txt") # needs to be read.csv for the file format
+amp <- read.csv("../data/IGTdata_amphetamine.txt") # needs to be read.csv for the file format
 
 # convert table to csv
 write.csv(controls, "../data/IGTdata_healthy_control.csv", row.names = FALSE)
 write.csv(heroin, "../data/IGTdata_heroin.csv", row.names = FALSE)
-write.csv(meth, "../data/IGTdata_amphetamine.csv", row.names = FALSE)
+write.csv(amp, "../data/IGTdata_amphetamine.csv", row.names = FALSE)
 
 # Load csvs
 controls <-read.csv("../data/IGTdata_healthy_control.csv")
 heroin <- read.csv("../data/IGTdata_heroin.csv")
-meth <- read.csv("../data/IGTdata_amphetamine.csv")
+amp <- read.csv("../data/IGTdata_amphetamine.csv")
 
 # set row 1 in each df as the column names and delete row 1
 colnames(controls) <- as.character(unlist(controls[1, ])) 
 colnames(heroin) <- as.character(unlist(heroin[1, ]))
-colnames(meth) <- as.character(unlist(meth[1, ]))
+colnames(amp) <- as.character(unlist(amp[1, ]))
 
 # delete row 1 with old column names
 controls <- controls[-1, ]
 heroin <- heroin[-1, ]
-meth <- meth[-1, ]
+amp <- amp[-1, ]
+
+# set trials to be numeric column for all dfs
+controls$trial <- as.numeric(controls$trial)
+heroin$trial <- as.numeric(heroin$trial)
+amp$trial <- as.numeric(amp$trial)
 
 ```
+
+''' MERGE DATA* '''
 ```{r}
 # merge data frames into one for easier processing
 controls$group <- 'control'
 heroin$group <- 'heroin'
-meth$group <- 'methamphetamine'
+amp$group <- 'amphetamine'
+
+# merge all data into one data frame for easier processing
+all_data <- bind_rows(controls, heroin, amp)
+all_data$trial <- as.numeric(all_data$trial)
 
 # collect data for easy plotting
 all_data <- all_data %>%
@@ -64,15 +75,24 @@ all_data <- all_data %>%
 
 ```
 
-
+''' PARTICIPANT AND TRIAL COUNT '''
 ```{r}
 # Table counting no. of completed trials per participant in each group
 all_data %>%
   group_by(subjID, group) %>%
   summarise(max_trials = max(trial)) %>%
+  group_by(max_trials, group) %>%
+  summarise(count = n()) %>%
+  arrange(group, desc(max_trials))
+
+# check how many participants have different number of max trials per group
+controls %>% 
+  group_by(subjID) %>%
+  summarise(max_trials = max(trial)) %>%
   group_by(max_trials) %>%
   summarise(count = n()) %>%
   arrange(desc(max_trials))
+
 
 heroin %>%
   group_by(subjID) %>%
@@ -81,14 +101,28 @@ heroin %>%
   summarise(count = n()) %>%
   arrange(desc(max_trials))
 
-meth %>%
+amp %>%
   group_by(subjID) %>%
   summarise(max_trials = max(trial)) %>%
   group_by(max_trials) %>%
   summarise(count = n()) %>%
   arrange(desc(max_trials))
 
-# All groups only have participants with over 94 completed trials, with most completing 99 trials.
+
+# remove all subjects with max_trials < 100
+all_data <- all_data %>% 
+  group_by(subjID, group) %>% 
+  filter(max(trial) >= 100) %>%
+  ungroup()
+
+
+# Check again --> all good!
+all_data %>%
+  group_by(subjID, group) %>%
+  summarise(max_trials = max(trial)) %>%
+  group_by(max_trials) %>%
+  summarise(count = n()) %>%
+  arrange(desc(max_trials))
 
 ```
 
@@ -105,9 +139,56 @@ all_data %>%
 sum(is.na(all_data))
 ```
 
+ ''' ADV / DISADV DECKS PLOTTING AND DEFINING '''
+```{r}
+# split decks into adv and disadv decks
+#two of the decks (decks C and D) are advantageous (“good”) and two (decks A and B) are disadvantageous (“bad”) in terms of their long-term payoffs.
+all_data <- all_data %>%
+  mutate(deck_type = case_when(
+    deck %in% c("1", "2") ~ "disadvantageous",
+    deck %in% c("3", "4") ~ "advantageous",
+    TRUE ~ NA_character_
+  ))
+
+# split the 100 trials were divided into five blocks of 20 trials
+all_data <- all_data %>%  
+  mutate(trial = as.numeric(trial)) %>%
+  mutate(block = case_when(
+    trial >= 1  & trial <= 19 ~ 1,
+    trial >= 20 & trial <= 39 ~ 2,
+    trial >= 40 & trial <= 59 ~ 3,
+    trial >= 60 & trial <= 79 ~ 4,
+    trial >= 80 & trial <= 100 ~ 5
+  ))
+
+# ADD BASELINE: Trial 0 with cumulative_payoff = 0 for each subject
+# This ensures cumulative payoff plots start at 0
+baseline <- all_data %>%
+  distinct(subjID, group) %>%
+  mutate(trial = 0, 
+         cumulative_payoff = 0,
+         deck = NA_character_,
+         gain = 0,
+         loss = 0,
+         payoff = 0,
+         deck_type = NA_character_,
+         block = 0)
+
+# After adding baseline and arranging
+all_data <- bind_rows(baseline, all_data) %>%
+  arrange(subjID, trial) %>%
+  group_by(subjID) %>%
+  mutate(cumulative_payoff = cumsum(payoff)) %>%  # Recalculate!
+  ungroup()
+
+sum(is.na(all_data)) # there is are two NAs for each trial "0" baseline added (one for deck and one for dec_type)
+```
+
+''' PLOT PAYOFF'''
 ```{r}
 # Plot payoff per group as a distribution. Payoff is the total sum of gains and losses per participant
 all_data %>%
+  filter(trial > 0) %>%  # Exclude baseline for summary statistics
   group_by(subjID, group) %>%
   summarise(payoff = sum(as.numeric(gain)) + sum(as.numeric(loss))) %>%
   ggplot(aes(x = payoff, fill = group)) +
@@ -130,48 +211,66 @@ all_data %>%
 # smoothed lines
 all_data %>%
   ggplot(aes(x = trial, y = cumulative_payoff, color = group)) +
-  geom_smooth(aes(group = group), method = "loess", se = TRUE, size = 1.5) +
+  geom_smooth(aes(group = group), ampod = "loess", se = TRUE, size = 1.5) +
   labs(title = "Cumulative Payoff Over Trials by Group (with SE)",
        x = "Trial",
        y = "Cumulative Payoff") +
   theme_minimal()
 
-
 ```
+
 ```{r}
-# plot payoff per deck overall
+# plot payoff per deck by group
 all_data %>%
-  group_by(deck) %>%
-  ggplot(aes(x = deck, y = cumulative_payoff, fill = deck)) +
-  geom_bar(stat = "identity", alpha = 0.7) +
-  labs(title = "Total Payoff by Deck",
+  filter(trial > 0) %>%  # Exclude baseline
+  group_by(subjID, group, deck) %>%
+  summarise(cumulative_payoff = sum(as.numeric(gain)) + sum(as.numeric(loss))) %>%
+  ggplot(aes(x = deck, y = cumulative_payoff, fill = group)) +
+  geom_bar(stat = "identity", position = "dodge", alpha = 0.7) +
+  labs(title = "Total Payoff by Deck and Group",
        x = "Deck",
        y = "Total Payoff (Gains + Losses)") +
   theme_minimal()
 ```
 
 ```{r}
-# split decks into adv and disadv decks
-#two of the decks (decks C and D) are advantageous (“good”) and two (decks A and B) are disadvantageous (“bad”) in terms of their long-term payoffs.
-all_data <- all_data %>%
-  mutate(deck_type = case_when(
-    deck %in% c("3", "4") ~ "advantageous",
-    deck %in% c("1", "2") ~ "disadvantageous",
-    TRUE ~ NA_character_
-  ))
+# plot payoff per deck overall
+all_data %>%
+  filter(trial > 0) %>%  # Exclude baseline
+  group_by(deck) %>%
+  summarise(cumulative_payoff = sum(as.numeric(gain)) + sum(as.numeric(loss))) %>%
+  ggplot(aes(x = deck, y = cumulative_payoff, fill = deck)) +
+  geom_bar(stat = "identity", alpha = 0.7) +
+  labs(title = "Total Payoff by Deck",
+       x = "Deck",
+       y = "Total Payoff (Gains + Losses)") +
+    scale_y_continuous(labels = scales::comma) +
+  theme_minimal()
+```
 
-# split the 100 trials were divided into five blocks of 20 trials
-all_data <- all_data %>%  
-  mutate(trial = as.numeric(trial)) %>%
-  mutate(block = case_when(
-    trial >= 1  & trial <= 19 ~ 1,
-    trial >= 20 & trial <= 39 ~ 2,
-    trial >= 40 & trial <= 59 ~ 3,
-    trial >= 60 & trial <= 79 ~ 4,
-    trial >= 80 & trial <= 100 ~ 5
-  ))
+```{r}
+# Total payoff mean across participants
+# plot average payoff per deck across participants
+all_data %>%
+  filter(trial > 0) %>%  # Exclude baseline
+  group_by(subjID, deck) %>%
+  summarise(total_payoff = sum(as.numeric(gain)) + sum(as.numeric(loss)), .groups = "drop") %>%
+  group_by(deck) %>%
+  summarise(mean_payoff = mean(total_payoff)) %>%
+  ggplot(aes(x = deck, y = mean_payoff, fill = deck)) +
+  geom_bar(stat = "identity", alpha = 0.7) +
+  labs(title = "Average Payoff by Deck Across Participants",
+       x = "Deck",
+       y = "Average Payoff (Gains + Losses)") +
+  scale_y_continuous(labels = scales::comma, breaks = seq(-2000, 1000, by = 500)) +  # More breaks
+  theme_minimal()
+```
 
 
+```{r}
+# Check which rows have NA or non-numeric values in the plotting variable - ALL GOOD now
+summary(all_data$block)
+unique(all_data$trial[is.na(all_data$block)])
 ```
 
 ```{r}
@@ -191,7 +290,7 @@ all_data %>%
 # now with geom_line showing over blocks where 100 trials are split into 5 blocks
 all_data %>%
   group_by(subjID, group, block, deck_type) %>%
-  summarise(total_choices = n()) %>%
+  summarise(total_choices = n(), .groups = "drop") %>%
   pivot_wider(names_from = deck_type, values_from = total_choices, values_fill = 0) %>%
   mutate(net_score = advantageous - disadvantageous) %>%
   ggplot(aes(x = block, y = net_score, color = group)) +
@@ -203,13 +302,20 @@ all_data %>%
 
 ```
 
-
 ```{r}
-# Check which rows have NA or non-numeric values in the plotting variable - ALL GOOD now
-summary(all_data$block)
-unique(all_data$trial[is.na(all_data$block)])
-
+# Check average payoff per deck
+all_data %>%
+  filter(trial > 0) %>%
+  group_by(deck) %>%
+  summarise(
+    mean_gain = mean(as.numeric(gain)),
+    mean_loss = mean(as.numeric(loss)),
+    mean_payoff = mean(as.numeric(gain) + as.numeric(loss)),
+    total_payoff = sum(as.numeric(gain) + as.numeric(loss))
+  ) %>%
+  arrange(desc(mean_payoff))
 ```
+
 
 GOALS:
 Calculate basic performance metrics for each group:
@@ -220,6 +326,7 @@ Total money won/lost
 ```{r}
 # Calculate % choices from "good" decks (C, D) vs. "bad" decks (A, B) - computes the mean across subjects in each group
 all_data %>%
+  filter(trial > 0) %>%
   group_by(subjID, group, deck_type) %>%
   summarise(total_choices = n()) %>%
   pivot_wider(names_from = deck_type, values_from = total_choices, values_fill = 0) %>%
@@ -230,9 +337,11 @@ all_data %>%
   summarise(mean_percent_advantageous = mean(percent_advantageous),
             mean_percent_disadvantageous = mean(percent_disadvantageous))
 ```
+
 ```{r}
 # percentage of choices per deck by group - BEST AS IT IS RELATIVE TO NO. TRIALS
 deck_counts <- all_data %>%
+  filter(trial > 0) %>% # remove baseline
   group_by(group, deck) %>%
   summarise(n_choices = n(), .groups = "drop") %>%
   group_by(group) %>%
@@ -253,6 +362,7 @@ ggplot(deck_counts, aes(x = deck, y = percent, fill = group)) +
 ```{r}
 # Plot how advantageous and disadvantageous decks are chosen per group
 adv_disadv_counts <- all_data %>%
+  filter(trial > 0) %>% # remove baseline
   group_by(group, deck_type) %>%
   summarise(n_choices = n(), .groups = "drop") %>% 
   group_by(group) %>%
@@ -266,7 +376,7 @@ ggplot(adv_disadv_counts, aes(x = deck_type, y = percent, fill = group))+
     y = "Number of Choices"
   ) +
   theme_minimal() +
-  scale_fill_brewer(palette = "Set1")
+  scale_fill_brewer(palette = "Set1"
 
 ```
 
