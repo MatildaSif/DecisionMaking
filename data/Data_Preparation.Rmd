@@ -108,22 +108,6 @@ amp %>%
   summarise(count = n()) %>%
   arrange(desc(max_trials))
 
-
-# remove all subjects with max_trials < 100
-all_data <- all_data %>% 
-  group_by(subjID, group) %>% 
-  filter(max(trial) >= 100) %>%
-  ungroup()
-
-
-# Check again --> all good!
-all_data %>%
-  group_by(subjID, group) %>%
-  summarise(max_trials = max(trial)) %>%
-  group_by(max_trials) %>%
-  summarise(count = n()) %>%
-  arrange(desc(max_trials))
-
 ```
 
 
