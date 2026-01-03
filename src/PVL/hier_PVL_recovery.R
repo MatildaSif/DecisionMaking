@@ -1,9 +1,19 @@
-install.packages("pacman")
-pacman::p_load(R2jags, parallel, ggpubr, extraDistr, truncnorm)
+#install.packages("pacman")
+#pacman::p_load(R2jags, parallel, ggpubr, extraDistr, truncnorm)
+install.packages("parallel")
+install.packages("ggpubr")
+install.packages("extraDistr")
+install.packages("truncnorm")
+install.packages("R2jags")
+library(ggpubr)
+library(R2jags)
+library(parallel)
+library(extraDistr)
+library(truncnorm)
 
 set.seed(1983)
 
-setwd('/work/Module4/parameter_recovery/')
+setwd('/work/JoMat/DecisionMaking/src/PVL/')
 
 # defining a function for calculating the maximum of the posterior density (not exactly the same as the mode)
 MPD <- function(x) {
@@ -69,7 +79,7 @@ payoff <- cbind(A,B,C,D)/100 # combining all four decks as columns with each 100
 colSums(payoff) # the two bad decks should sum to -25 (i.e. -2500), and the two good ones to 25 (i.e. 2500)
 
 ###--------------Run full parameter recovery -------------
-niterations <- 100 # fewer because it takes too long
+niterations <- 2 # was 100 # fewer because it takes too long
 nsubs <- 48 # mimicking the data structure from Ahn et al.
 ntrials_all <- rep(100, 48) # all 48 subs have 100 trials each
 
@@ -99,16 +109,15 @@ start_time = Sys.time()
 for (i in 1:niterations) {
   ntrials <- ntrials_all
   
-  # let's see how robust the model is. Does it recover all sorts of values?
   mu_w <- runif(1,.5,2.5)
   mu_A <- runif(1,0,1)
   mu_theta <- runif(1,0,2)
   mu_a <- runif(1,0,1)
   
-  sigma_w <- runif(1,0,0.2)
-  sigma_A <- runif(1,0,0.1)
-  sigma_theta <- runif(1,0,0.2)
-  sigma_a <- runif(1,0,0.1)
+  sigma_w <- runif(1,0.01,0.2) # set all minimums to 0.01 to avoid dividing by 0 --> get infinities
+  sigma_A <- runif(1,0.01,0.1)
+  sigma_theta <- runif(1,0.01,0.2)
+  sigma_a <- runif(1,0.01,0.1)
   
   source('hier_PVL_sim.R')
   PVL_sims <- hier_PVL_sim(payoff,nsubs,ntrials,mu_w,mu_A,mu_a,mu_theta,
@@ -156,27 +165,32 @@ for (i in 1:niterations) {
 end_time = Sys.time()
 end_time - start_time
 
-# let's look at some scatter plots
-# plotting code courtesy of Lasse
+# scatter plots
 source('recov_plot.R')
 pl1 <- recov_plot(true_mu_w, infer_mu_w, c("true mu_w", "infer mu_w"), 'smoothed linear fit')
 pl2 <- recov_plot(true_mu_A, infer_mu_A, c("true mu_A", "infer mu_A"), 'smoothed linear fit')
 pl3 <- recov_plot(true_mu_theta, infer_mu_theta, c("true mu_theta", "infer mu_theta"), 'smoothed linear fit')
 pl4 <- recov_plot(true_mu_a, infer_mu_a, c("true mu_a", "infer mu_a"), 'smoothed linear fit')
 ggarrange(pl1, pl2, pl3, pl4)
+ggsave("output/mu_parameter_recovery.png", mu_plots, width = 12, height = 10, dpi = 300)
+
 
 # sigma (aka. true_lambda) re-coded as precision
-pl1 <- recov_plot(infer_lambda_w, 1/(true_lambda_w^2), c("infer lambda_w","true lambda_w"), 'smoothed linear fit')
-pl2 <- recov_plot(infer_lambda_A, 1/(true_lambda_A^2), c("infer lambda_A","true lambda_A"), 'smoothed linear fit')
-pl3 <- recov_plot(infer_lambda_theta, 1/(true_lambda_theta^2), c("infer lambda_theta", "true lambda_theta"), 'smoothed linear fit')
-pl4 <- recov_plot(infer_lambda_a, 1/(true_lambda_a^2), c("infer lambda_a", "true lambda_a"), 'smoothed linear fit')
-ggarrange(pl1, pl2, pl3, pl4)
+pl5 <- recov_plot(infer_lambda_w, 1/(true_lambda_w^2), c("infer lambda_w","true lambda_w"), 'smoothed linear fit')
+pl6 <- recov_plot(infer_lambda_A, 1/(true_lambda_A^2), c("infer lambda_A","true lambda_A"), 'smoothed linear fit')
+pl7 <- recov_plot(infer_lambda_theta, 1/(true_lambda_theta^2), c("infer lambda_theta", "true lambda_theta"), 'smoothed linear fit')
+pl8 <- recov_plot(infer_lambda_a, 1/(true_lambda_a^2), c("infer lambda_a", "true lambda_a"), 'smoothed linear fit')
+ggarrange(pl5, pl6, pl7, pl8)
+ggsave("output/lambda_precision_recovery.png", lambda_precision_plots, width = 12, height = 10, dpi = 300)
+
 
 # lambda (aka. infer_lambda) re-coded as SD
-pl1 <- recov_plot(1/sqrt(infer_lambda_w), true_lambda_w, c("infer lambda_w","true lambda_w"), 'smoothed linear fit')
-pl2 <- recov_plot(1/sqrt(infer_lambda_A), true_lambda_A, c("infer lambda_A","true lambda_A"), 'smoothed linear fit')
-pl3 <- recov_plot(1/sqrt(infer_lambda_theta), true_lambda_theta, c("infer lambda_theta", "true lambda_theta"), 'smoothed linear fit')
-pl4 <- recov_plot(1/sqrt(infer_lambda_a), true_lambda_a, c("infer lambda_a", "true lambda_a"), 'smoothed linear fit')
-ggarrange(pl1, pl2, pl3, pl4)
+pl9 <- recov_plot(1/sqrt(infer_lambda_w), true_lambda_w, c("infer lambda_w","true lambda_w"), 'smoothed linear fit')
+pl10 <- recov_plot(1/sqrt(infer_lambda_A), true_lambda_A, c("infer lambda_A","true lambda_A"), 'smoothed linear fit')
+pl11 <- recov_plot(1/sqrt(infer_lambda_theta), true_lambda_theta, c("infer lambda_theta", "true lambda_theta"), 'smoothed linear fit')
+pl12 <- recov_plot(1/sqrt(infer_lambda_a), true_lambda_a, c("infer lambda_a", "true lambda_a"), 'smoothed linear fit')
+ggarrange(pl9, pl10, pl11, pl12)
+ggsave("output/lambda_sd_recovery.png", lambda_sd_plots, width = 12, height = 10, dpi = 300)
+
 
 
