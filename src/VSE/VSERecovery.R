@@ -3,8 +3,8 @@ install.packages("pacman")
 pacman::p_load(extraDistr, R2jags)
 
 
-setwd("/work/JohanneSejrskildRejsenhus#9686/DecisionMaking/src")
-set.seed(1982)
+setwd("/work/JoMat/DecisionMaking/src")
+set.seed(1702)
 
 #------ create task environment -------------------
 #Bad frequent
@@ -116,12 +116,23 @@ infer_c <- array(0,c(niterations))
 
 for (i in 1:niterations) {
   
-  # let's see how robust the model is. Does it recover all sorts of values?
-  theta <- runif(1,0,.8) #NOTE IF BOTH LEARNING RATES ARE TOO HIGH, CHOICE RULE WILL CRASH!!!
-  delta <- runif(1,0,.8)
-  alpha <- runif(1,0,1)
-  phi <- rnorm(1,0,.01)
-  c <- runif(1,.5,3)
+  # # let's see how robust the model is. Does it recover all sorts of values?
+  # theta <- runif(1,0,.8) #NOTE IF BOTH LEARNING RATES ARE TOO HIGH, CHOICE RULE WILL CRASH!!!
+  # delta <- runif(1,0,.8)
+  # alpha <- runif(1,0,1)
+  # phi <- rnorm(1,0,.01)
+  # c <- runif(1,.5,3)
+  
+  # Sample from realistic ranges based on what you've observed
+  theta <- runif(1, 0.3, 0.7)      # decay: observed range ~0.4-0.6
+  delta <- runif(1, 0.4, 1.2)      # exploration bonus: ~0.5-1.0 
+  alpha <- runif(1, 0.2, 0.5)      # sensitivity: ~0.25-0.35
+  c <- runif(1, 0.6, 1.1)          # consistency: ~0.7-0.95 (NOT 0.5-3!)
+  phi <- runif(1, 0.3, 0.6)        # exploration update: ~0.4-0.5
+  
+  # Truncate to keep in valid range
+  theta <- pmax(0.01, pmin(0.99, theta))
+  delta <- pmax(0.01, pmin(0.99, delta))
 
   VSE_sims <- VSE(R,L,ntrials,theta,delta,alpha,phi,c)
   
@@ -163,12 +174,15 @@ for (i in 1:niterations) {
 
 # let's look at some scatter plots
 
+# Save all plots in one PDF file
+pdf("parameter_recovery_plots_VSE_single.pdf", width=10, height=8)
 par(mfrow=c(2,2))
-plot(true_theta,infer_theta)
-plot(true_delta,infer_delta)
-plot(true_alpha,infer_alpha)
-plot(true_phi,infer_phi)
-plot(true_c,infer_c)
+plot(true_theta, infer_theta, main="Theta Recovery")
+plot(true_delta, infer_delta, main="Delta Recovery")
+plot(true_alpha, infer_alpha, main="Alpha Recovery")
+plot(true_phi, infer_phi, main="Phi Recovery")
+plot(true_c, infer_c, main="C Recovery")
+dev.off()
 
 
 

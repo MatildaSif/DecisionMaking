@@ -1,7 +1,7 @@
 # More informative plotting - code-courtesy of Lasse - fanx!
 recov_plot <- function(true, infer, plot_lab, plot_col) {
   
-  # library(ggplot2)
+  library(ggplot2)
   
   df <- data.frame(true, infer)
   

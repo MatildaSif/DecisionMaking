@@ -1,0 +1,65 @@
+model {
+  mu_theta ~ dnorm(0,1)T(0,1)      # learning rate (0-1)
+  mu_delta ~ dnorm(0,1)T(0,)       # exploration bonus value
+  mu_alpha ~ dnorm(0,1)T(0,1)      # exploration weight
+  mu_phi ~ dnorm(0,1)T(0,1)        # exploration decay rate
+  mu_c ~ dnorm(0,.1)T(0,)          # inverse temperature
+  
+  #lambda_theta ~ dgamma(.01,.01)
+  #lambda_delta ~ dgamma(.01,.01)
+  #lambda_alpha ~ dgamma(.01,.01)
+  #lambda_phi ~ dgamma(.01,.01)
+  #lambda_c ~ dgamma(.01,.01)
+  
+  #Trying these more informative priors from the PVL to avoid lambda being infinitive 
+  lambda_theta ~ dgamma(2.5/2,0.01/2)
+  lambda_delta ~ dgamma(2.5/2,0.01/2)
+  lambda_alpha ~ dgamma(2.5/2,0.01/2)
+  lambda_phi ~ dgamma(2.5/2,0.01/2)
+  lambda_c ~ dgamma(2.5/2,0.01/2)
+  
+  for (s in 1:nsubs) {
+    theta[s] ~ dnorm(mu_theta,lambda_theta)T(0,1)
+    delta[s] ~ dnorm(mu_delta,lambda_delta)T(0,)
+    alpha[s] ~ dnorm(mu_alpha,lambda_alpha)T(0,1)
+    phi[s] ~ dnorm(mu_phi,lambda_phi)T(0,1)
+    c[s] ~ dnorm(mu_c,lambda_c)T(0,)
+    
+    # Initialize t=1
+    for (d in 1:4) {
+      exploit[s,1,d] <- 0
+      explore[s,1,d] <- 0
+    }
+  
+    for (t in 2:ntrials_all[s]) {
+      
+      # Outcome value (can use prospect theory or simple difference)
+      v[s,t] <- (R[s,t-1]^0.5) - (L[s,t-1]^0.5)  # or just: R[s,t-1] - L[s,t-1]
+      
+      for (d in 1:4) {
+        
+        # Exploitation: Delta-rule learning for CHOSEN deck only
+        exploit[s,t,d] <- ifelse(d==x[s,t-1],
+                               exploit[s,t-1,d] + theta[s]*(v[s,t] - exploit[s,t-1,d]),
+                               exploit[s,t-1,d])
+        
+        # Exploration: Boost CHOSEN, decay UNCHOSEN toward 0
+        explore[s,t,d] <- ifelse(d==x[s,t-1],
+                               delta[s],
+                               explore[s,t-1,d] * (1 - phi[s]))
+        
+        # Combined expected value
+        Ev[s,t,d] <- exploit[s,t,d] + alpha[s] * explore[s,t,d]
+        
+        # Softmax
+        exp_p[s,t,d] <- exp(c[s] * Ev[s,t,d])
+      }
+      
+      for (d in 1:4) {
+        p[s,t,d] <- exp_p[s,t,d]/sum(exp_p[s,t,])
+      }
+        
+      x[s,t] ~ dcat(p[s,t,])
+    }
+  }
+}
