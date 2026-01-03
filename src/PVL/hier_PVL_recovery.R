@@ -1,6 +1,5 @@
 #install.packages("pacman")
 #pacman::p_load(R2jags, parallel, ggpubr, extraDistr, truncnorm)
-install.packages("parallel")
 install.packages("ggpubr")
 install.packages("extraDistr")
 install.packages("truncnorm")
@@ -79,7 +78,7 @@ payoff <- cbind(A,B,C,D)/100 # combining all four decks as columns with each 100
 colSums(payoff) # the two bad decks should sum to -25 (i.e. -2500), and the two good ones to 25 (i.e. 2500)
 
 ###--------------Run full parameter recovery -------------
-niterations <- 2 # was 100 # fewer because it takes too long
+niterations <- 50 # was 100 # fewer because it takes too long
 nsubs <- 48 # mimicking the data structure from Ahn et al.
 ntrials_all <- rep(100, 48) # all 48 subs have 100 trials each
 
@@ -171,8 +170,15 @@ pl1 <- recov_plot(true_mu_w, infer_mu_w, c("true mu_w", "infer mu_w"), 'smoothed
 pl2 <- recov_plot(true_mu_A, infer_mu_A, c("true mu_A", "infer mu_A"), 'smoothed linear fit')
 pl3 <- recov_plot(true_mu_theta, infer_mu_theta, c("true mu_theta", "infer mu_theta"), 'smoothed linear fit')
 pl4 <- recov_plot(true_mu_a, infer_mu_a, c("true mu_a", "infer mu_a"), 'smoothed linear fit')
-ggarrange(pl1, pl2, pl3, pl4)
-ggsave("output/mu_parameter_recovery.png", mu_plots, width = 12, height = 10, dpi = 300)
+
+# Arrange and display
+mu_plots <- ggarrange(pl1, pl2, pl3, pl4, ncol = 2, nrow = 2)
+print(mu_plots)
+
+# Save mu parameters plot
+ggsave("PVL_recovery_mu_parameters.png", mu_plots, 
+       width = 12, height = 10, dpi = 300)
+cat("\nSaved: PVL_recovery_mu_parameters.png\n")
 
 
 # sigma (aka. true_lambda) re-coded as precision
@@ -180,8 +186,15 @@ pl5 <- recov_plot(infer_lambda_w, 1/(true_lambda_w^2), c("infer lambda_w","true 
 pl6 <- recov_plot(infer_lambda_A, 1/(true_lambda_A^2), c("infer lambda_A","true lambda_A"), 'smoothed linear fit')
 pl7 <- recov_plot(infer_lambda_theta, 1/(true_lambda_theta^2), c("infer lambda_theta", "true lambda_theta"), 'smoothed linear fit')
 pl8 <- recov_plot(infer_lambda_a, 1/(true_lambda_a^2), c("infer lambda_a", "true lambda_a"), 'smoothed linear fit')
-ggarrange(pl5, pl6, pl7, pl8)
-ggsave("output/lambda_precision_recovery.png", lambda_precision_plots, width = 12, height = 10, dpi = 300)
+
+# Arrange and display
+lambda_precision_plots <- ggarrange(pl5, pl6, pl7, pl8, ncol = 2, nrow = 2)
+print(lambda_precision_plots)
+
+# Save lambda precision plot
+ggsave("PVL_recovery_lambda_precision.png", lambda_precision_plots, 
+       width = 12, height = 10, dpi = 300)
+cat("Saved: PVL_recovery_lambda_precision.png\n")
 
 
 # lambda (aka. infer_lambda) re-coded as SD
@@ -189,8 +202,44 @@ pl9 <- recov_plot(1/sqrt(infer_lambda_w), true_lambda_w, c("infer lambda_w","tru
 pl10 <- recov_plot(1/sqrt(infer_lambda_A), true_lambda_A, c("infer lambda_A","true lambda_A"), 'smoothed linear fit')
 pl11 <- recov_plot(1/sqrt(infer_lambda_theta), true_lambda_theta, c("infer lambda_theta", "true lambda_theta"), 'smoothed linear fit')
 pl12 <- recov_plot(1/sqrt(infer_lambda_a), true_lambda_a, c("infer lambda_a", "true lambda_a"), 'smoothed linear fit')
-ggarrange(pl9, pl10, pl11, pl12)
-ggsave("output/lambda_sd_recovery.png", lambda_sd_plots, width = 12, height = 10, dpi = 300)
 
+# Arrange and display
+lambda_sd_plots <- ggarrange(pl9, pl10, pl11, pl12, ncol = 2, nrow = 2)
+print(lambda_sd_plots)
+
+# Save lambda SD plot
+ggsave("PVL_recovery_lambda_sd.png", lambda_sd_plots, 
+       width = 12, height = 10, dpi = 300)
+cat("Saved: PVL_recovery_lambda_sd.png\n")
+
+
+# Save results to RData file
+save(true_mu_w, true_mu_A, true_mu_theta, true_mu_a,
+     infer_mu_w, infer_mu_A, infer_mu_theta, infer_mu_a,
+     true_lambda_w, true_lambda_A, true_lambda_theta, true_lambda_a,
+     infer_lambda_w, infer_lambda_A, infer_lambda_theta, infer_lambda_a,
+     file = "PVL_recovery_results.RData")
+cat("Saved: PVL_recovery_results.RData\n")
+
+
+# Print summary statistics
+cat("\n=== RECOVERY SUMMARY ===\n")
+cat("\nGroup Means (mu) - Correlations:\n")
+cat("w:", cor(true_mu_w, infer_mu_w), "\n")
+cat("A:", cor(true_mu_A, infer_mu_A), "\n")
+cat("theta:", cor(true_mu_theta, infer_mu_theta), "\n")
+cat("a:", cor(true_mu_a, infer_mu_a), "\n")
+
+cat("\nGroup Precision/SD (lambda) - Correlations:\n")
+cat("w (as precision):", cor(infer_lambda_w, 1/(true_lambda_w^2)), "\n")
+cat("A (as precision):", cor(infer_lambda_A, 1/(true_lambda_A^2)), "\n")
+cat("theta (as precision):", cor(infer_lambda_theta, 1/(true_lambda_theta^2)), "\n")
+cat("a (as precision):", cor(infer_lambda_a, 1/(true_lambda_a^2)), "\n")
+
+cat("\nGroup Precision/SD (lambda) - Correlations as SD:\n")
+cat("w (as SD):", cor(1/sqrt(infer_lambda_w), true_lambda_w), "\n")
+cat("A (as SD):", cor(1/sqrt(infer_lambda_A), true_lambda_A), "\n")
+cat("theta (as SD):", cor(1/sqrt(infer_lambda_theta), true_lambda_theta), "\n")
+cat("a (as SD):", cor(1/sqrt(infer_lambda_a), true_lambda_a), "\n")
 
 
