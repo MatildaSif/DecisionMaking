@@ -59,18 +59,21 @@ RD[D < 0] = 0
 
 # extract losses from reward trials
 LA <- A
-LA[A > 0] = 0
+LA[A > 0] <- 0
+LA <- abs(LA)
 LB <- B
-LB[B > 0] = 0
+LB[B > 0] <- 0
+LB <- abs(LB)
 LC <- C
-LC[C > 0] = 0
+LC[C > 0] <- 0
+LC <- abs(LC)
 LD <- D
-LD[D > 0] = 0
+LD[D > 0] <- 0
+LD <- abs(LD)
 
 # Create payoff matrices (deck-specific)
 R_decks <- cbind(RA, RB, RC, RD) # We have 100 rows and 4 decs (columns)
 L_decks <- cbind(LA, LB, LC, LD) # We have the same here
-L_decks <- abs(L_decks) # makes the losses positive
 
 ###--------------Run full parameter recovery -------------
 ntrials <- 100 
@@ -137,6 +140,9 @@ for (i in 1:niterations) {
   R <- VSE_sims$R  # realized rewards (nsubs x ntrials)
   L <- VSE_sims$L  # realized losses (nsubs x ntrials)
   
+  print(dim(R))
+  print(dim(L))
+  
   # Set up JAGS
   data <- list("x", "R", "L", "ntrials_all", "nsubs")
   params <- c("mu_theta", "mu_delta", "mu_alpha", "mu_phi", "mu_c",
@@ -144,7 +150,7 @@ for (i in 1:niterations) {
   
   samples <- jags.parallel(data, inits=NULL, params,
                            model.file="heir_VSE.txt", n.chains=3, 
-                           n.iter=3000, n.burnin=1000, n.thin=1, n.cluster=4)
+                           n.iter=1000, n.burnin=500, n.thin=1, n.cluster=4)
   
   # Store true GROUP-LEVEL parameters
   true_mu_theta[i] <- mu_theta
@@ -200,7 +206,15 @@ pl4 <- recov_plot(true_mu_phi, infer_mu_phi,
 pl5 <- recov_plot(true_mu_c, infer_mu_c, 
                   c("true mu_c", "infer mu_c"), 'mu_c recovery')
 
-ggarrange(pl1, pl2, pl3, pl4, pl5, ncol = 3, nrow = 2)
+# Arrange and display
+mu_plot <- ggarrange(pl1, pl2, pl3, pl4, pl5, ncol = 3, nrow = 2)
+print(mu_plot)
+
+# Save mu parameters plot
+ggsave("VSE_recovery_mu_parameters.png", mu_plot, 
+       width = 12, height = 8, dpi = 300)
+cat("\nSaved: VSE_recovery_mu_parameters.png\n")
+
 
 # Plotting recovery results for sigma parameters
 pl6 <- recov_plot(true_sigma_theta, infer_sigma_theta, 
@@ -214,7 +228,14 @@ pl9 <- recov_plot(true_sigma_phi, infer_sigma_phi,
 pl10 <- recov_plot(true_sigma_c, infer_sigma_c, 
                    c("true sigma_c", "infer sigma_c"), 'sigma_c recovery')
 
-ggarrange(pl6, pl7, pl8, pl9, pl10, ncol = 3, nrow = 2)
+# Arrange and display
+sigma_plot <- ggarrange(pl6, pl7, pl8, pl9, pl10, ncol = 3, nrow = 2)
+print(sigma_plot)
+
+# Save sigma parameters plot
+ggsave("VSE_recovery_sigma_parameters.png", sigma_plot, 
+       width = 12, height = 8, dpi = 300)
+cat("Saved: VSE_recovery_sigma_parameters.png\n")
 
 # Save results
 save(true_mu_theta, true_mu_delta, true_mu_alpha, true_mu_phi, true_mu_c,

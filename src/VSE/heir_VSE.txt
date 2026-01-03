@@ -29,12 +29,15 @@ model {
     for (d in 1:4) {
       exploit[s,1,d] <- 0
       explore[s,1,d] <- 0
+      Ev[s, 1, d] <- 0
+      exp_p[s, 1, d] <- 1  # Equal probability at t=1
+      p[s, 1, d] <- 0.25   # Flat prior
     }
   
     for (t in 2:ntrials_all[s]) {
       
       # Outcome value (can use prospect theory or simple difference)
-      v[s,t] <- (R[s,t-1]^0.5) - (L[s,t-1]^0.5)  # or just: R[s,t-1] - L[s,t-1]
+      v[s,t] <- pow(R[s, t-1], 0.5) - pow(L[s, t-1], 0.5)
       
       for (d in 1:4) {
         
