@@ -7,13 +7,16 @@ heir_VSE_sim <- function(R_decks, L_decks, nsubs, ntrials_all,
   R <- array(NA, c(nsubs,  ntrials_all[1]))
   L <- array(NA, c(nsubs,  ntrials_all[1]))
   
+  print(dim(R))
+  print(dim(L))
+  
   for (s in 1:nsubs) {
     # Sample parameters
     theta <- rtruncnorm(1, 0, 1, mu_theta, sigma_theta)      # learning rate
     delta <- rtruncnorm(1, 0, Inf, mu_delta, sigma_delta)    # exploration bonus
     alpha <- rtruncnorm(1, 0, 1, mu_alpha, sigma_alpha)      # exploration weight
     phi <- rtruncnorm(1, 0, 1, mu_phi, sigma_phi)            # decay rate
-    c <- rtruncnorm(1, 0, Inf, mu_c, sigma_c)                # inverse temp
+    c_param <- rtruncnorm(1, 0, Inf, mu_c, sigma_c)                # inverse temp
     
     exploit <- array(0, c(ntrials_all[s], 4))
     explore <- array(0, c( ntrials_all[s], 4))
@@ -24,10 +27,10 @@ heir_VSE_sim <- function(R_decks, L_decks, nsubs, ntrials_all,
     R[s, 1] <- R_decks[1, x[s, 1]]
     L[s, 1] <- L_decks[1, x[s, 1]]
     
-    for (t in 2:ntrials[s]) {
+    for (t in 2:ntrials_all[s]) {
       
       # Outcome value (can use prospect theory or simple difference) 
-      v[s,t] <- (R[s,t-1]^0.5) - (L[s,t-1]^0.5)
+      v <- (R[s,t-1]^0.5) - (L[s,t-1]^0.5)
       
       for (d in 1:4) {
         if (d == x[s, t-1]) {
@@ -45,7 +48,7 @@ heir_VSE_sim <- function(R_decks, L_decks, nsubs, ntrials_all,
       }
       
       # Softmax choice
-      exp_Ev <- exp(c * Ev[t, ])
+      exp_Ev <- exp(c_param * Ev[t, ])
       p <- exp_Ev / sum(exp_Ev)
       x[s, t] <- sample(1:4, 1, prob = p)
       
