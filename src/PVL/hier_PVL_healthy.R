@@ -5,7 +5,7 @@ set.seed(1983)
 setwd('/work/JoMat/DecisionMaking/')
 
 # Create output folder structure in PVL directory
-output_dir <- "PVL/outputs/parameter_recovery"
+output_dir <- "PVL/outputs/parameter_estimation"
 if (!dir.exists(output_dir)) {
   dir.create(output_dir, recursive = TRUE)
   cat("Created output directory:", output_dir, "\n")
