@@ -1,4 +1,4 @@
-#install.packages("pacman")
+install.packages("pacman")
 #pacman::p_load(R2jags, parallel, ggpubr, extraDistr, truncnorm)
 install.packages("ggpubr")
 install.packages("extraDistr")
@@ -13,6 +13,13 @@ library(truncnorm)
 set.seed(1983)
 
 setwd('/work/JoMat/DecisionMaking/src/PVL/')
+
+# Create output folder structure
+output_dir <- "../../PVL/outputs/parameter_recovery"
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir, recursive = TRUE)
+  cat("Created output directory:", output_dir, "\n")
+}
 
 # defining a function for calculating the maximum of the posterior density (not exactly the same as the mode)
 MPD <- function(x) {
@@ -78,8 +85,8 @@ payoff <- cbind(A,B,C,D)/100 # combining all four decks as columns with each 100
 colSums(payoff) # the two bad decks should sum to -25 (i.e. -2500), and the two good ones to 25 (i.e. 2500)
 
 ###--------------Run full parameter recovery -------------
-niterations <- 50 # was 100 # fewer because it takes too long
-nsubs <- 48 # mimicking the data structure from Ahn et al.
+niterations <- 10 # was 100 # fewer because it takes too long
+nsubs <- 48 # mimicking the data structure from Ahn et al
 ntrials_all <- rep(100, 48) # all 48 subs have 100 trials each
 
 # mu
@@ -94,10 +101,10 @@ infer_mu_theta <- array(NA,c(niterations))
 infer_mu_a <- array(NA,c(niterations))
 
 # sigma (SD for R) / lambda (precision for JAGS)
-true_lambda_w <- array(NA,c(niterations))
-true_lambda_A <- array(NA,c(niterations))
-true_lambda_theta <- array(NA,c(niterations))
-true_lambda_a <- array(NA,c(niterations))
+true_sigma_w <- array(NA,c(niterations))
+true_sigma_A <- array(NA,c(niterations))
+true_sigma_theta <- array(NA,c(niterations))
+true_sigma_a <- array(NA,c(niterations))
 
 infer_lambda_w <- array(NA,c(niterations))
 infer_lambda_A <- array(NA,c(niterations))
@@ -110,12 +117,12 @@ for (i in 1:niterations) {
   
   mu_w <- runif(1,.5,2.5)
   mu_A <- runif(1,0,1)
-  mu_theta <- runif(1,0,2)
+  mu_theta <- runif(1, 0.5, 1.5)
   mu_a <- runif(1,0,1)
   
   sigma_w <- runif(1,0.01,0.2) # set all minimums to 0.01 to avoid dividing by 0 --> get infinities
   sigma_A <- runif(1,0.01,0.1)
-  sigma_theta <- runif(1,0.01,0.2)
+  sigma_theta <- runif(1, 0.05, 0.15)
   sigma_a <- runif(1,0.01,0.1)
   
   source('hier_PVL_sim.R')
@@ -138,24 +145,25 @@ for (i in 1:niterations) {
   true_mu_theta[i] <- mu_theta
   true_mu_a[i] <- mu_a
   
-  # find maximum a posteriori
-  Y <- samples$BUGSoutput$sims.list
-  infer_mu_w[i] <- MPD(Y$mu_w)
-  infer_mu_A[i] <- MPD(Y$mu_A)
-  infer_mu_theta[i] <- MPD(Y$mu_theta)
-  infer_mu_a[i] <- MPD(Y$mu_a)
-  
   # sigma
-  true_lambda_w[i] <- sigma_w
-  true_lambda_A[i] <- sigma_A
-  true_lambda_theta[i] <- sigma_theta
-  true_lambda_a[i] <- sigma_a
+  true_sigma_w[i] <- sigma_w
+  true_sigma_A[i] <- sigma_A
+  true_sigma_theta[i] <- sigma_theta
+  true_sigma_a[i] <- sigma_a
   
-  # find maximum a posteriori
-  infer_lambda_w[i] <- MPD(Y$lambda_w)
-  infer_lambda_A[i] <- MPD(Y$lambda_A)
-  infer_lambda_theta[i] <- MPD(Y$lambda_theta)
-  infer_lambda_a[i] <- MPD(Y$lambda_a)
+
+  # posterior mean (simplest and robust)
+  Y <- samples$BUGSoutput$sims.list
+  infer_mu_w[i] <- mean(Y$mu_w)
+  infer_mu_A[i] <- mean(Y$mu_A)
+  infer_mu_theta[i] <- mean(Y$mu_theta)
+  infer_mu_a[i] <- mean(Y$mu_a)
+  
+  # similarly for lambda / sigma
+  infer_lambda_w[i] <- mean(Y$lambda_w)
+  infer_lambda_A[i] <- mean(Y$lambda_A)
+  infer_lambda_theta[i] <- mean(Y$lambda_theta)
+  infer_lambda_a[i] <- mean(Y$lambda_a)
   
   print(i)
   
@@ -176,10 +184,15 @@ mu_plots <- ggarrange(pl1, pl2, pl3, pl4, ncol = 2, nrow = 2)
 print(mu_plots)
 
 # Save mu parameters plot
-ggsave("PVL_recovery_mu_parameters.png", mu_plots, 
+ggsave(file.path(output_dir, "PVL_recovery_mu_parameters.png"), mu_plots, 
        width = 12, height = 10, dpi = 300)
 cat("\nSaved: PVL_recovery_mu_parameters.png\n")
 
+# convert sigma to precision
+true_lambda_w <- 1 / (true_sigma_w^2)
+true_lambda_A <- 1 / (true_sigma_A^2)
+true_lambda_theta <- 1 / (true_sigma_theta^2)
+true_lambda_a <- 1 / (true_sigma_a^2)
 
 # sigma (aka. true_lambda) re-coded as precision
 pl5 <- recov_plot(infer_lambda_w, 1/(true_lambda_w^2), c("infer lambda_w","true lambda_w"), 'smoothed linear fit')
@@ -192,7 +205,7 @@ lambda_precision_plots <- ggarrange(pl5, pl6, pl7, pl8, ncol = 2, nrow = 2)
 print(lambda_precision_plots)
 
 # Save lambda precision plot
-ggsave("PVL_recovery_lambda_precision.png", lambda_precision_plots, 
+ggsave(file.path(output_dir, "PVL_recovery_lambda_precision.png"), lambda_precision_plots, 
        width = 12, height = 10, dpi = 300)
 cat("Saved: PVL_recovery_lambda_precision.png\n")
 
@@ -208,7 +221,7 @@ lambda_sd_plots <- ggarrange(pl9, pl10, pl11, pl12, ncol = 2, nrow = 2)
 print(lambda_sd_plots)
 
 # Save lambda SD plot
-ggsave("PVL_recovery_lambda_sd.png", lambda_sd_plots, 
+ggsave(file.path(output_dir, "PVL_recovery_lambda_sd.png"), lambda_sd_plots, 
        width = 12, height = 10, dpi = 300)
 cat("Saved: PVL_recovery_lambda_sd.png\n")
 
@@ -218,28 +231,33 @@ save(true_mu_w, true_mu_A, true_mu_theta, true_mu_a,
      infer_mu_w, infer_mu_A, infer_mu_theta, infer_mu_a,
      true_lambda_w, true_lambda_A, true_lambda_theta, true_lambda_a,
      infer_lambda_w, infer_lambda_A, infer_lambda_theta, infer_lambda_a,
-     file = "PVL_recovery_results.RData")
+     file = file.path(output_dir, "PVL_recovery_results.RData"))
 cat("Saved: PVL_recovery_results.RData\n")
 
 
-# Print summary statistics
-cat("\n=== RECOVERY SUMMARY ===\n")
-cat("\nGroup Means (mu) - Correlations:\n")
-cat("w:", cor(true_mu_w, infer_mu_w), "\n")
-cat("A:", cor(true_mu_A, infer_mu_A), "\n")
-cat("theta:", cor(true_mu_theta, infer_mu_theta), "\n")
-cat("a:", cor(true_mu_a, infer_mu_a), "\n")
+# Calculate recovery metrics and save to text file
+recovery_file <- file.path(output_dir, "recovery_metrics.txt")
+sink(recovery_file)
 
-cat("\nGroup Precision/SD (lambda) - Correlations:\n")
-cat("w (as precision):", cor(infer_lambda_w, 1/(true_lambda_w^2)), "\n")
-cat("A (as precision):", cor(infer_lambda_A, 1/(true_lambda_A^2)), "\n")
-cat("theta (as precision):", cor(infer_lambda_theta, 1/(true_lambda_theta^2)), "\n")
-cat("a (as precision):", cor(infer_lambda_a, 1/(true_lambda_a^2)), "\n")
+cat("\n=== RECOVERY METRICS (50 iterations) ===\n")
 
-cat("\nGroup Precision/SD (lambda) - Correlations as SD:\n")
-cat("w (as SD):", cor(1/sqrt(infer_lambda_w), true_lambda_w), "\n")
-cat("A (as SD):", cor(1/sqrt(infer_lambda_A), true_lambda_A), "\n")
-cat("theta (as SD):", cor(1/sqrt(infer_lambda_theta), true_lambda_theta), "\n")
-cat("a (as SD):", cor(1/sqrt(infer_lambda_a), true_lambda_a), "\n")
+cat("\nCorrelations (need > 0.7 for good recovery):\n")
+cat("w:    ", round(cor(true_mu_w, infer_mu_w), 3), "\n")
+cat("A:    ", round(cor(true_mu_A, infer_mu_A), 3), "\n")
+cat("theta:", round(cor(true_mu_theta, infer_mu_theta), 3), "\n")
+cat("a:    ", round(cor(true_mu_a, infer_mu_a), 3), "\n")
 
+cat("\nBias (should be near 0):\n")
+cat("w:    ", round(mean(infer_mu_w - true_mu_w), 3), "\n")
+cat("A:    ", round(mean(infer_mu_A - true_mu_A), 3), "\n")
+cat("theta:", round(mean(infer_mu_theta - true_mu_theta), 3), "\n")
+cat("a:    ", round(mean(infer_mu_a - true_mu_a), 3), "\n")
 
+cat("\nRMSE (lower is better):\n")
+cat("w:    ", round(sqrt(mean((infer_mu_w - true_mu_w)^2)), 3), "\n")
+cat("A:    ", round(sqrt(mean((infer_mu_A - true_mu_A)^2)), 3), "\n")
+cat("theta:", round(sqrt(mean((infer_mu_theta - true_mu_theta)^2)), 3), "\n")
+cat("a:    ", round(sqrt(mean((infer_mu_a - true_mu_a)^2)), 3), "\n")
+
+sink()
+cat("Saved: recovery_metrics.txt\n")
