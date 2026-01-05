@@ -1,18 +1,20 @@
 install.packages("pacman")
-pacman::p_load(R2jags, parallel)
+pacman::p_load(R2jags, parallel, ggplot2)
 
 set.seed(1983)
+setwd('/work/JoMat/DecisionMaking/')
 
-setwd('/work/Module4/parameter_estimation/')
+# Create output folder structure in PVL directory
+output_dir <- "PVL/outputs/parameter_recovery"
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir, recursive = TRUE)
+  cat("Created output directory:", output_dir, "\n")
+}
 
-# defining a function for calculating the maximum of the posterior density (not exactly the same as the mode)
+# defining a function for calculating the maximum of the posterior density
 MPD <- function(x) {
   density(x)$x[which(density(x)$y==max(density(x)$y))]
 }
-
-#----------getting the data
-# data from this paper: https://www.frontiersin.org/articles/10.3389/fpsyg.2014.00849/full
-# available here: https://figshare.com/articles/dataset/IGT_raw_data_Ahn_et_al_2014_Frontiers_in_Psychology/1101324
 
 #load control data
 ctr_data <- read.table("data/IGTdata_heroin.txt",header=TRUE)
@@ -28,12 +30,6 @@ x_raw <- ctr_data$deck
 X_raw <- ctr_data$gain + ctr_data$loss #note the sign!
 
 #--- assign choices and outcomes in trial x sub matrix
-
-#different number of trials across subjects. We'll need to fix this by padding arrays of < 100
-#this is just so we can make the array
-#then we'll also need to record number of valid trials for each sub, 
-#then run the JAGS model on only valid trials
-
 # empty arrays to fill
 ntrials_all <- array(0,c(nsubs))
 x_all <- array(0,c(nsubs,ntrials_max))
@@ -57,64 +53,112 @@ for (s in 1:nsubs) {
   
 }
 
-
-#----------testing our data curation by running JAGS on one subject
-
-# Now we'll fit one subject just to make sure everything works
-
-x <- x_all[1,]
-X <- X_all[1,]
-
-ntrials <- ntrials_all[1]
-
-# set up jags and run jags model on one subject
-data <- list("x","X","ntrials") 
-params<-c("w","A","theta","a","p")
-temp_samples <- jags.parallel(data, inits=NULL, params,
-                model.file ="PVL.txt",
-                n.chains=3, n.iter=5000, n.burnin=1000, n.thin=1, n.cluster=4)
-
-# let's look at the posteriors for the parameters
-par(mfrow=c(2,2))
-plot(density(temp_samples$BUGSoutput$sims.list$w))
-plot(density(temp_samples$BUGSoutput$sims.list$A))
-plot(density(temp_samples$BUGSoutput$sims.list$theta))
-plot(density(temp_samples$BUGSoutput$sims.list$a))
-
-# Question: how would you expect the data to look on the basis of these posteriors?
-
-
-
 ###########################################################
 #---------- run the hierarchical model on controls --------
 ###########################################################
-
 x <- x_all
 X <- X_all
-
 ntrials <- ntrials_all
 
 # set up jags and run jags model
 data <- list("x","X","ntrials","nsubs") 
-params<-c("mu_w","mu_A","mu_theta","mu_a","lambda_w","lambda_A","lambda_theta","lambda_a")
+
+# MODIFIED: Include subject-level parameters AND log_lik for model comparison
+params <- c("mu_w", "mu_A", "mu_theta", "mu_a",
+            "lambda_w", "lambda_A", "lambda_theta", "lambda_a",
+            "w", "A", "theta", "a")                 
+
+cat("Fitting hierarchical PVL model to heroin addicts... \n")
+cat("Number of subjects:", nsubs, "\n")
 
 start_time = Sys.time()
 samples <- jags.parallel(data, inits=NULL, params,
-                model.file ="hier_PVL.txt",
-                n.chains=3, n.iter=5000, n.burnin=1000, n.thin=1, n.cluster=4)
+                         model.file ="src/PVL/hier_PVL.txt",
+                         n.chains=3, n.iter=5000, n.burnin=1000, n.thin=1, n.cluster=4)
 end_time = Sys.time()
-end_time - start_time
+cat("Fitting time:", end_time - start_time, "\n")
 
-# let's look at the posteriors for the parameters
-par(mfrow=c(2,2))
-plot(density(samples$BUGSoutput$sims.list$mu_w))
-plot(density(samples$BUGSoutput$sims.list$mu_A))
-plot(density(samples$BUGSoutput$sims.list$mu_theta))
-plot(density(samples$BUGSoutput$sims.list$mu_a))
+# Check dimensions
+cat("\n=== Checking saved parameters ===\n")
+Y <- samples$BUGSoutput$sims.list
+cat("Group-level parameters:\n")
+cat("  mu_w:", length(Y$mu_w), "samples\n")
+cat("  mu_A:", length(Y$mu_A), "samples\n")
+cat("  mu_theta:", length(Y$mu_theta), "samples\n")
+cat("  mu_a:", length(Y$mu_a), "samples\n")
 
-# let's look at the posteriors for the parameters
+cat("\nSubject-level parameters:\n")
+cat("  w:", dim(Y$w), "(samples x subjects)\n")
+cat("  A:", dim(Y$A), "(samples x subjects)\n")
+cat("  theta:", dim(Y$theta), "(samples x subjects)\n")
+cat("  a:", dim(Y$a), "(samples x subjects)\n")
+
+if ("log_lik" %in% names(Y)) {
+  cat("\nLog-likelihood:", dim(Y$log_lik), "(samples x subjects)\n")
+}
+
+# Save group-level posterior plots
+png(file.path(output_dir, "01_group_level_posteriors_heroin.png"), width=800, height=800)
 par(mfrow=c(2,2))
-plot(density(samples$BUGSoutput$sims.list$lambda_w))
-plot(density(samples$BUGSoutput$sims.list$lambda_A))
-plot(density(samples$BUGSoutput$sims.list$lambda_theta))
-plot(density(samples$BUGSoutput$sims.list$lambda_a))
+plot(density(Y$mu_w), main="Group mean: w")
+plot(density(Y$mu_A), main="Group mean: A")
+plot(density(Y$mu_theta), main="Group mean: theta")
+plot(density(Y$mu_a), main="Group mean: a")
+dev.off()
+cat("Saved: 01_group_level_posteriors_heroin.png\n")
+
+# Save group-level precision plots
+png(file.path(output_dir, "02_group_level_precisions_heroin.png"), width=800, height=800)
+par(mfrow=c(2,2))
+plot(density(Y$lambda_w), main="Group precision: lambda_w")
+plot(density(Y$lambda_A), main="Group precision: lambda_A")
+plot(density(Y$lambda_theta), main="Group precision: lambda_theta")
+plot(density(Y$lambda_a), main="Group precision: lambda_a")
+dev.off()
+cat("Saved: 02_group_level_precisions_heroin.png\n")
+
+# Save subject-level posterior plots (Subject 1)
+png(file.path(output_dir, "03_subject_1_posteriors_heroin.png"), width=800, height=800)
+par(mfrow=c(2,2))
+plot(density(Y$w[,1]), main="Subject 1: w")
+plot(density(Y$A[,1]), main="Subject 1: A")
+plot(density(Y$theta[,1]), main="Subject 1: theta")
+plot(density(Y$a[,1]), main="Subject 1: a")
+dev.off()
+cat("Saved: 03_subject_1_posteriors_heroin.png\n")
+
+# Save everything to RData file
+rdata_file <- file.path(output_dir, "PVL_heroin_posteriors.RData")
+save(samples, x_all, X_all, ntrials_all, nsubs, subIDs,
+     file = rdata_file) 
+cat("\n=== Saved posteriors to", rdata_file, "===\n")
+
+# Save summary statistics to text file
+summary_file <- file.path(output_dir, "model_summary_heroin.txt")
+sink(summary_file)
+
+cat("=== FITTED PARAMETERS (Heroin) ===\n")
+cat("\nGroup Means (mu):\n")
+cat("w:    ", round(MPD(Y$mu_w), 3), "\n")
+cat("A:    ", round(MPD(Y$mu_A), 3), "\n")
+cat("theta:", round(MPD(Y$mu_theta), 3), "\n")
+cat("a:    ", round(MPD(Y$mu_a), 3), "\n")
+
+cat("\nGroup Precisions (lambda):\n")
+cat("w:    ", round(MPD(Y$lambda_w), 3), "\n")
+cat("A:    ", round(MPD(Y$lambda_A), 3), "\n")
+cat("theta:", round(MPD(Y$lambda_theta), 3), "\n")
+cat("a:    ", round(MPD(Y$lambda_a), 3), "\n")
+
+cat("\nGroup SDs (converted from lambda):\n")
+cat("w:    ", round(MPD(1/sqrt(Y$lambda_w)), 3), "\n")
+cat("A:    ", round(MPD(1/sqrt(Y$lambda_A)), 3), "\n")
+cat("theta:", round(MPD(1/sqrt(Y$lambda_theta)), 3), "\n")
+cat("a:    ", round(MPD(1/sqrt(Y$lambda_a)), 3), "\n")
+
+cat("\n=== MODEL FIT ===\n")
+cat("DIC:", round(samples$BUGSoutput$DIC, 2), "\n")
+cat("pD: ", round(samples$BUGSoutput$pD, 2), "\n")
+
+sink()
+cat("Saved: model_summary_heroin.txt\n")
