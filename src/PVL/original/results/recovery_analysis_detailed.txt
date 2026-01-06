@@ -1,0 +1,149 @@
+
+===============================================
+=== PARAMETER RECOVERY QUALITY ===
+===============================================
+Criterion: r >= 0.7 indicates good recovery
+
+  Parameter Correlation
+1         w  -0.1645758
+2         A   0.4384650
+3     theta   0.3287038
+4         a   0.3023021
+
+Summary: 0 out of 4 parameters show good recovery (r >= 0.7)
+
+Saved: pvl_recovery_quality_correlations.png
+
+===============================================
+=== SIGMA (BETWEEN-SUBJECT VARIABILITY) RECOVERY ===
+===============================================
+Converting lambda (precision) to sigma (SD): sigma = 1/sqrt(lambda)
+
+    Parameter Correlation
+1     sigma_w          NA
+2     sigma_A          NA
+3 sigma_theta -0.09041926
+4     sigma_a -0.01998994
+
+Summary: NA out of 4 sigma parameters show good recovery (r >= 0.7)
+
+===============================================
+=== CORRELATIONS BETWEEN TRUE GROUP-LEVEL PARAMETERS ===
+===============================================
+           w      A  theta      a
+w      1.000  0.074 -0.024  0.020
+A      0.074  1.000 -0.016 -0.130
+theta -0.024 -0.016  1.000 -0.075
+a      0.020 -0.130 -0.075  1.000
+Saved: pvl_correlation_true_parameters.png
+
+===============================================
+=== CORRELATIONS BETWEEN INFERRED GROUP-LEVEL PARAMETERS ===
+===============================================
+           w      A  theta      a
+w      1.000 -0.098  0.173  0.593
+A     -0.098  1.000 -0.242 -0.084
+theta  0.173 -0.242  1.000  0.459
+a      0.593 -0.084  0.459  1.000
+Saved: pvl_correlation_inferred_parameters.png
+
+===============================================
+=== INVESTIGATING PARAMETER TRADE-OFFS ===
+===============================================
+
+True parameter correlations:
+           w      A  theta      a
+w      1.000  0.074 -0.024  0.020
+A      0.074  1.000 -0.016 -0.130
+theta -0.024 -0.016  1.000 -0.075
+a      0.020 -0.130 -0.075  1.000
+
+Inferred parameter correlations:
+           w      A  theta      a
+w      1.000 -0.098  0.173  0.593
+A     -0.098  1.000 -0.242 -0.084
+theta  0.173 -0.242  1.000  0.459
+a      0.593 -0.084  0.459  1.000
+
+--- Identifying strong correlations (|r| > 0.3) ---
+Inferred: w vs a: r = 0.593
+Inferred: theta vs a: r = 0.459
+
+===============================================
+=== RECOVERY ERRORS ANALYSIS ===
+===============================================
+
+Mean Absolute Errors:
+    w_error     A_error theta_error     a_error 
+     1.2064      0.2016      0.8644      0.3424 
+
+Root Mean Squared Errors:
+    w_error     A_error theta_error     a_error 
+     1.3830      0.3732      1.0245      0.4415 
+
+Mean Bias (positive = overestimation):
+    w_error     A_error theta_error     a_error 
+    -0.4338     -0.0371     -0.8633     -0.1711 
+
+--- BIAS CHECK: Do errors depend on true values? ---
+  Parameter Error_vs_True
+1         w    -0.5874159
+2         A    -0.2805278
+3     theta    -0.8175736
+4         a    -0.4607398
+
+Interpretation:
+  Negative correlation = underestimation bias at high values
+  Positive correlation = overestimation bias at high values
+Saved: pvl_recovery_error_patterns.png
+
+===============================================
+=== FULL CROSS-PARAMETER CORRELATION MATRIX ===
+===============================================
+
+Cross-parameter correlations (rows=true, cols=inferred):
+           infer_w infer_A infer_theta infer_a
+true_w      -0.165   0.066      -0.289  -0.466
+true_A      -0.211   0.438      -0.391  -0.317
+true_theta  -0.233  -0.002       0.329  -0.410
+true_a       0.140   0.012       0.351   0.302
+Saved: pvl_cross_parameter_correlations.png
+
+--- PROBLEMATIC CROSS-CORRELATIONS (|r| > 0.3 off-diagonal) ---
+These indicate confusability between parameters:
+
+  true_w <-> infer_a: r = -0.466
+  true_A <-> infer_theta: r = -0.391
+  true_A <-> infer_a: r = -0.317
+  true_theta <-> infer_a: r = -0.410
+  true_a <-> infer_theta: r =  0.351
+
+===============================================
+=== SUMMARY ===
+===============================================
+
+Parameter Recovery (r between true and inferred):
+  Parameter Correlation
+1         w  -0.1645758
+2         A   0.4384650
+3     theta   0.3287038
+4         a   0.3023021
+
+Sigma Recovery:
+    Parameter Correlation
+1     sigma_w          NA
+2     sigma_A          NA
+3 sigma_theta -0.09041926
+4     sigma_a -0.01998994
+
+===============================================
+=== FILES GENERATED ===
+===============================================
+  1. pvl_recovery_quality_correlations.png - Main recovery plot
+  2. pvl_correlation_true_parameters.png
+  3. pvl_correlation_inferred_parameters.png
+  4. pvl_recovery_error_patterns.png
+  5. pvl_cross_parameter_correlations.png
+  6. recovery_analysis_detailed.txt - This file
+
+===============================================
