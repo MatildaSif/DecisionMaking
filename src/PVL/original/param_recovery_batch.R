@@ -66,8 +66,8 @@ for (i in 1:(ntrials/nstruct)) {
 payoff <- cbind(A, B, C, D) / 100
 
 ###----- Run parameter recovery for this iteration batch -----
-# Running 10 iterations per job for reasonable runtime
-niterations <- 10
+# Running 5 iterations per job for reasonable runtime
+niterations <- 5
 nsubs <- 48
 ntrials_all <- rep(100, 48)
 
@@ -103,10 +103,10 @@ for (i in 1:niterations) {
   mu_theta <- runif(1, 0, 2)
   mu_a <- runif(1, 0, 1)
   
-  sigma_w <- runif(1, 0, 0.2)
-  sigma_A <- runif(1, 0, 0.1)
-  sigma_theta <- runif(1, 0, 0.2)
-  sigma_a <- runif(1, 0, 0.1)
+  sigma_w <- runif(1, 0, 0.05)
+  sigma_A <- runif(1, 0, 0.05)
+  sigma_theta <- runif(1, 0, 0.05)
+  sigma_a <- runif(1, 0, 0.05)
   
   source('hier_PVL_sim.R')
   PVL_sims <- hier_PVL_sim(payoff, nsubs, ntrials, mu_w, mu_A, mu_a, mu_theta,

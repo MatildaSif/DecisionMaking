@@ -6,16 +6,16 @@ model {
   mu_theta ~ dnorm(0,1)T(0,) 
   mu_a ~ dnorm(0,1)T(0,1) 
    
-  # lambda_w ~ dgamma(0.01,0.01)
-  # lambda_A ~ dgamma(0.01,0.01)
-  # lambda_theta ~ dgamma(0.01,0.01)
-  # lambda_a ~ dgamma(0.01,0.01) 
+  #lambda_w ~ dgamma(0.01,0.01) # set this back to go back to good results 07/01
+  #lambda_A ~ dgamma(0.01,0.01)
+  #lambda_theta ~ dgamma(0.01,0.01)
+  #lambda_a ~ dgamma(0.01,0.01)
   
-  # more informed priors (that hopefully fit the SD used in the simulation a bit better)
-  lambda_w ~ dgamma(2.5/2,0.01/2)
-  lambda_A ~ dgamma(2.5/2,0.01/2)
-  lambda_theta ~ dgamma(2.5/2,0.01/2)
-  lambda_a ~ dgamma(2.5/2,0.01/2) 
+  lambda_w ~ dgamma(2.5/2, 0.01/2)    # dgamma(1.25, 0.005)
+  lambda_A ~ dgamma(2.5/2, 0.01/2)
+  lambda_theta ~ dgamma(2.5/2, 0.01/2)
+  lambda_a ~ dgamma(2.5/2, 0.01/2)
+
    
    
   for (s in 1:nsubs){                                       #subject loop
