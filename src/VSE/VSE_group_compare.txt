@@ -1,0 +1,210 @@
+model {
+  
+  # ===== GROUP-LEVEL PRIORS FOR CONTROLS =====
+  mu_theta_ctr ~ dnorm(0,1)T(0,1)      
+  mu_delta_ctr ~ dnorm(0,1)T(0,1)       
+  mu_alpha_ctr ~ dnorm(0,1)T(0,1)      
+  mu_phi_ctr ~ dnorm(0,.1)        
+  mu_c_ctr ~ dnorm(0,.1)T(0,)          
+  
+  lambda_theta_ctr ~ dgamma(2.5/2, 0.01/2)
+  lambda_delta_ctr ~ dgamma(2.5/2, 0.01/2)
+  lambda_alpha_ctr ~ dgamma(2.5/2, 0.01/2)
+  lambda_phi_ctr ~ dgamma(2.5/2, 0.01/2)
+  lambda_c_ctr ~ dgamma(2.5/2, 0.01/2)
+  
+  # ===== GROUP-LEVEL PRIORS FOR HEROIN USERS =====
+  mu_theta_opi ~ dnorm(0,1)T(0,1)      
+  mu_delta_opi ~ dnorm(0,1)T(0,1)       
+  mu_alpha_opi ~ dnorm(0,1)T(0,1)      
+  mu_phi_opi ~ dnorm(0,.1)        
+  mu_c_opi ~ dnorm(0,.1)T(0,)          
+  
+  lambda_theta_opi ~ dgamma(2.5/2, 0.01/2)
+  lambda_delta_opi ~ dgamma(2.5/2, 0.01/2)
+  lambda_alpha_opi ~ dgamma(2.5/2, 0.01/2)
+  lambda_phi_opi ~ dgamma(2.5/2, 0.01/2)
+  lambda_c_opi ~ dgamma(2.5/2, 0.01/2)
+  
+  # ===== GROUP-LEVEL PRIORS FOR AMPHETAMINE USERS =====
+  mu_theta_amp ~ dnorm(0,1)T(0,1)      
+  mu_delta_amp ~ dnorm(0,1)T(0,1)       
+  mu_alpha_amp ~ dnorm(0,1)T(0,1)      
+  mu_phi_amp ~ dnorm(0,.1)        
+  mu_c_amp ~ dnorm(0,.1)T(0,)          
+  
+  lambda_theta_amp ~ dgamma(2.5/2, 0.01/2)
+  lambda_delta_amp ~ dgamma(2.5/2, 0.01/2)
+  lambda_alpha_amp ~ dgamma(2.5/2, 0.01/2)
+  lambda_phi_amp ~ dgamma(2.5/2, 0.01/2)
+  lambda_c_amp ~ dgamma(2.5/2, 0.01/2)
+  
+  # ===== COMPUTE GROUP DIFFERENCES =====
+  # Controls vs Heroin
+  diff_theta_ctr_opi <- mu_theta_ctr - mu_theta_opi
+  diff_delta_ctr_opi <- mu_delta_ctr - mu_delta_opi
+  diff_alpha_ctr_opi <- mu_alpha_ctr - mu_alpha_opi
+  diff_phi_ctr_opi <- mu_phi_ctr - mu_phi_opi
+  diff_c_ctr_opi <- mu_c_ctr - mu_c_opi
+  
+  # Controls vs Amphetamine
+  diff_theta_ctr_amp <- mu_theta_ctr - mu_theta_amp
+  diff_delta_ctr_amp <- mu_delta_ctr - mu_delta_amp
+  diff_alpha_ctr_amp <- mu_alpha_ctr - mu_alpha_amp
+  diff_phi_ctr_amp <- mu_phi_ctr - mu_phi_amp
+  diff_c_ctr_amp <- mu_c_ctr - mu_c_amp
+  
+  # Heroin vs Amphetamine
+  diff_theta_opi_amp <- mu_theta_opi - mu_theta_amp
+  diff_delta_opi_amp <- mu_delta_opi - mu_delta_amp
+  diff_alpha_opi_amp <- mu_alpha_opi - mu_alpha_amp
+  diff_phi_opi_amp <- mu_phi_opi - mu_phi_amp
+  diff_c_opi_amp <- mu_c_opi - mu_c_amp
+  
+  # ===== CONTROLS =====
+  for (s in 1:nsubs_ctr) {
+    theta_ctr[s] ~ dnorm(mu_theta_ctr, lambda_theta_ctr)T(0,1)
+    delta_ctr[s] ~ dnorm(mu_delta_ctr, lambda_delta_ctr)T(0,1)
+    alpha_ctr[s] ~ dnorm(mu_alpha_ctr, lambda_alpha_ctr)T(0,1)
+    phi_ctr[s] ~ dnorm(mu_phi_ctr, lambda_phi_ctr)
+    c_ctr[s] ~ dnorm(mu_c_ctr, lambda_c_ctr)T(0,)
+    
+    # Initialize t=1
+    for (d in 1:4) {
+      exploit_ctr[s,1,d] <- 0
+      explore_ctr[s,1,d] <- 0
+      Ev_ctr[s,1,d] <- 0
+      exp_p_ctr[s,1,d] <- 1
+      p_ctr[s,1,d] <- 0.25
+    }
+  
+    for (t in 2:ntrials_ctr[s]) {
+      
+      # Separate reward and loss components
+      R_ctr[s,t] <- max(0, X_ctr[s,t-1])
+      L_ctr[s,t] <- abs(min(0, X_ctr[s,t-1]))
+      
+      # Value function: v = R^θ - L^θ
+      v_ctr[s,t] <- pow(R_ctr[s,t], theta_ctr[s]) - pow(L_ctr[s,t], theta_ctr[s])
+      
+      for (d in 1:4) {
+        
+        # Exploitation: decay + add value for CHOSEN, decay only for UNCHOSEN
+        exploit_ctr[s,t,d] <- ifelse(d==x_ctr[s,t-1],
+                                     delta_ctr[s] * exploit_ctr[s,t-1,d] + v_ctr[s,t],
+                                     delta_ctr[s] * exploit_ctr[s,t-1,d])
+        
+        # Exploration: reset to 0 for CHOSEN, delta-rule toward phi for UNCHOSEN
+        explore_ctr[s,t,d] <- ifelse(d==x_ctr[s,t-1],
+                                     0,
+                                     explore_ctr[s,t-1,d] + alpha_ctr[s] * (phi_ctr[s] - explore_ctr[s,t-1,d]))
+        
+        # Combined expected value
+        Ev_ctr[s,t,d] <- exploit_ctr[s,t,d] + explore_ctr[s,t,d]
+        
+        # Softmax
+        exp_p_ctr[s,t,d] <- exp(c_ctr[s] * Ev_ctr[s,t,d])
+      }
+      
+      for (d in 1:4) {
+        p_ctr[s,t,d] <- exp_p_ctr[s,t,d]/sum(exp_p_ctr[s,t,])
+      }
+        
+      x_ctr[s,t] ~ dcat(p_ctr[s,t,])
+    }
+  }
+  
+  # ===== HEROIN USERS =====
+  for (s in 1:nsubs_opi) {
+    theta_opi[s] ~ dnorm(mu_theta_opi, lambda_theta_opi)T(0,1)
+    delta_opi[s] ~ dnorm(mu_delta_opi, lambda_delta_opi)T(0,1)
+    alpha_opi[s] ~ dnorm(mu_alpha_opi, lambda_alpha_opi)T(0,1)
+    phi_opi[s] ~ dnorm(mu_phi_opi, lambda_phi_opi)
+    c_opi[s] ~ dnorm(mu_c_opi, lambda_c_opi)T(0,)
+    
+    # Initialize t=1
+    for (d in 1:4) {
+      exploit_opi[s,1,d] <- 0
+      explore_opi[s,1,d] <- 0
+      Ev_opi[s,1,d] <- 0
+      exp_p_opi[s,1,d] <- 1
+      p_opi[s,1,d] <- 0.25
+    }
+  
+    for (t in 2:ntrials_opi[s]) {
+      
+      R_opi[s,t] <- max(0, X_opi[s,t-1])
+      L_opi[s,t] <- abs(min(0, X_opi[s,t-1]))
+      
+      v_opi[s,t] <- pow(R_opi[s,t], theta_opi[s]) - pow(L_opi[s,t], theta_opi[s])
+      
+      for (d in 1:4) {
+        
+        exploit_opi[s,t,d] <- ifelse(d==x_opi[s,t-1],
+                                     delta_opi[s] * exploit_opi[s,t-1,d] + v_opi[s,t],
+                                     delta_opi[s] * exploit_opi[s,t-1,d])
+        
+        explore_opi[s,t,d] <- ifelse(d==x_opi[s,t-1],
+                                     0,
+                                     explore_opi[s,t-1,d] + alpha_opi[s] * (phi_opi[s] - explore_opi[s,t-1,d]))
+        
+        Ev_opi[s,t,d] <- exploit_opi[s,t,d] + explore_opi[s,t,d]
+        
+        exp_p_opi[s,t,d] <- exp(c_opi[s] * Ev_opi[s,t,d])
+      }
+      
+      for (d in 1:4) {
+        p_opi[s,t,d] <- exp_p_opi[s,t,d]/sum(exp_p_opi[s,t,])
+      }
+        
+      x_opi[s,t] ~ dcat(p_opi[s,t,])
+    }
+  }
+  
+  # ===== AMPHETAMINE USERS =====
+  for (s in 1:nsubs_amp) {
+    theta_amp[s] ~ dnorm(mu_theta_amp, lambda_theta_amp)T(0,1)
+    delta_amp[s] ~ dnorm(mu_delta_amp, lambda_delta_amp)T(0,1)
+    alpha_amp[s] ~ dnorm(mu_alpha_amp, lambda_alpha_amp)T(0,1)
+    phi_amp[s] ~ dnorm(mu_phi_amp, lambda_phi_amp)
+    c_amp[s] ~ dnorm(mu_c_amp, lambda_c_amp)T(0,)
+    
+    # Initialize t=1
+    for (d in 1:4) {
+      exploit_amp[s,1,d] <- 0
+      explore_amp[s,1,d] <- 0
+      Ev_amp[s,1,d] <- 0
+      exp_p_amp[s,1,d] <- 1
+      p_amp[s,1,d] <- 0.25
+    }
+  
+    for (t in 2:ntrials_amp[s]) {
+      
+      R_amp[s,t] <- max(0, X_amp[s,t-1])
+      L_amp[s,t] <- abs(min(0, X_amp[s,t-1]))
+      
+      v_amp[s,t] <- pow(R_amp[s,t], theta_amp[s]) - pow(L_amp[s,t], theta_amp[s])
+      
+      for (d in 1:4) {
+        
+        exploit_amp[s,t,d] <- ifelse(d==x_amp[s,t-1],
+                                     delta_amp[s] * exploit_amp[s,t-1,d] + v_amp[s,t],
+                                     delta_amp[s] * exploit_amp[s,t-1,d])
+        
+        explore_amp[s,t,d] <- ifelse(d==x_amp[s,t-1],
+                                     0,
+                                     explore_amp[s,t-1,d] + alpha_amp[s] * (phi_amp[s] - explore_amp[s,t-1,d]))
+        
+        Ev_amp[s,t,d] <- exploit_amp[s,t,d] + explore_amp[s,t,d]
+        
+        exp_p_amp[s,t,d] <- exp(c_amp[s] * Ev_amp[s,t,d])
+      }
+      
+      for (d in 1:4) {
+        p_amp[s,t,d] <- exp_p_amp[s,t,d]/sum(exp_p_amp[s,t,])
+      }
+        
+      x_amp[s,t] ~ dcat(p_amp[s,t,])
+    }
+  }
+}

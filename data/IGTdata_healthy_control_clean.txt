@@ -1,4 +1,4 @@
-"trial"	"deck"	"gain"	"loss"	"subjID"
+trial	deck	gain	loss	subjID
 1	3	50	0	103
 2	3	60	0	103
 3	3	40	-50	103

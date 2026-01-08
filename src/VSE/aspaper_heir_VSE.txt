@@ -1,0 +1,66 @@
+model {
+  mu_theta ~ dnorm(0,1)T(0,1)      
+  mu_delta ~ dnorm(0,1)T(0,1)       
+  mu_alpha ~ dnorm(0,1)T(0,1)      
+  mu_phi ~ dnorm(0,1)        
+  mu_c ~ dnorm(0,.1)T(0,)          
+  
+  # More informative priors from PVL to avoid lambda being infinite 
+  lambda_theta ~ dgamma(2.5/2,0.01/2)
+  lambda_delta ~ dgamma(2.5/2,0.01/2)
+  lambda_alpha ~ dgamma(2.5/2,0.01/2)
+  lambda_phi ~ dgamma(2.5/2,0.01/2)
+  lambda_c ~ dgamma(2.5/2,0.01/2)
+  
+  for (s in 1:nsubs) {
+    theta[s] ~ dnorm(mu_theta,lambda_theta)T(0,1)
+    delta[s] ~ dnorm(mu_delta,lambda_delta)T(0,1)
+    alpha[s] ~ dnorm(mu_alpha,lambda_alpha)T(0,1)
+    phi[s] ~ dnorm(mu_phi,lambda_phi)
+    c[s] ~ dnorm(mu_c,lambda_c)T(0,)
+    
+    # Initialize t=1
+    for (d in 1:4) {
+      exploit[s,1,d] <- 0
+      explore[s,1,d] <- 0
+      Ev[s,1,d] <- 0
+      exp_p[s,1,d] <- 1
+      p[s,1,d] <- 0.25
+    }
+  
+    for (t in 2:ntrials[s]) {
+      
+      # Separate reward and loss components
+      R[s,t] <- max(0, X[s,t-1])
+      L[s,t] <- abs(min(0, X[s,t-1]))
+      
+      # v = R^θ - L^θ
+      v[s,t] <- pow(R[s,t], theta[s]) - pow(L[s,t], theta[s])
+      
+      for (d in 1:4) {
+        
+        # Exploitation: decay and add value for CHOSEN deck, decay only for UNCHOSEN
+        exploit[s,t,d] <- ifelse(d==x[s,t-1],
+                                 delta[s] * exploit[s,t-1,d] + v[s,t],
+                                 delta[s] * exploit[s,t-1,d])
+        
+        # Exploration: reset to 0 for CHOSEN, delta-rule toward phi for UNCHOSEN
+        explore[s,t,d] <- ifelse(d==x[s,t-1],
+                                 0,
+                                 explore[s,t-1,d] + alpha[s] * (phi[s] - explore[s,t-1,d]))
+        
+        # Combined expected value
+        Ev[s,t,d] <- exploit[s,t,d] + explore[s,t,d]
+        
+        # Softmax
+        exp_p[s,t,d] <- exp(c[s] * Ev[s,t,d])
+      }
+      
+      for (d in 1:4) {
+        p[s,t,d] <- exp_p[s,t,d]/sum(exp_p[s,t,])
+      }
+        
+      x[s,t] ~ dcat(p[s,t,])
+    }
+  }
+}
